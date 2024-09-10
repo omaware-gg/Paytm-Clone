@@ -1,6 +1,11 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 
-mongoose.connect("mongodb+srv://omaware6512:or1eJQqfdEPuM8IJ@cluster0.ju2u1.mongodb.net/paytm")
+const MONGO_URI = process.env.MONGO_URI;
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("MongoDB connected"))
+    .catch((err) => console.error("MongoDB connection error: ", err));
 
 // Create a Schema for Users
 const userSchema = new mongoose.Schema({
@@ -32,6 +37,15 @@ const userSchema = new mongoose.Schema({
     }
 });
 
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+    if (this.isModified("password")) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+    next();
+})
+
 const accountSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId, // Reference to User model
@@ -40,7 +54,8 @@ const accountSchema = new mongoose.Schema({
     },
     balance: {
         type: Number,
-        required: true
+        required: true,
+        default: () => 1 + Math.random() * 10000
     }
 });
 

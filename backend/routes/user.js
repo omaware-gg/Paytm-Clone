@@ -1,7 +1,7 @@
 const express = require("express");
-
 const router = express.Router();
 const zod = require("zod");
+const bcrypt = require("bcrypt");
 const { User, Account } = require("../db");
 const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../config");
@@ -43,12 +43,13 @@ router.post("/signup", async (req, res) => {
 
     await Account.create({
         userId,
-        balance: 1 + Math.random() * 10000
     })
 
     const token = jwt.sign({
         userId
-    }, JWT_SECRET);
+    }, JWT_SECRET, {
+        expiresIn: "1h"
+    });
 
     res.json({
         message: "User created successfully",
@@ -65,26 +66,38 @@ router.post("/signin", async (req, res) => {
     const body = req.body;
     const { success } = signinSchema.safeParse(body);
     if (!success) {
-        return res.json({
-            message: "Email already taken / Incorrect inputs"
+        return res.status(400).json({
+            message: "Invalid inputs"
         })
     }
 
     const user = await User.findOne({
         username: body.username,
-        password: body.password
     });
 
-    if (user) {
-        const token = jwt.sign({
-            userId: user._id
-        }, JWT_SECRET);
-
-        res.json({
-            token: token
+    if (!user) {
+        return res.status(400).json({
+            message: "User not found"
         })
-        return;
     }
+
+    // Compare hashed password with input password
+    const validPassword = await bcrypt.compare(body.password, user.password);
+    if (!validPassword) {
+        return res.status(401).json({
+            message: "Invalid credentials"
+        })
+    }
+
+    const token = jwt.sign({
+        userId: user._id
+    }, JWT_SECRET, {
+        expiresIn: "1h"
+    });
+
+    res.json({
+        token: token
+    })
 
     res.status(411).json({
         message: "Error while logging in"
@@ -105,9 +118,9 @@ router.put("/", authMiddleware, async (req, res) => {
         })
     }
 
-		await User.updateOne(req.body, {
-            id: req.userId
-        });
+		await User.updateOne({
+            _id: req.userId
+        }, req.body);
 	
     res.json({
         message: "Updated successfully"

@@ -9,4 +9,8 @@ const mainRouter = require("./routes/index");
 
 app.use("/api/v1", mainRouter);
 
-app.listen(3000);
+app.listen(3000, () => {
+    console.log("Server running on port 3000");
+}).on("error", (err) => {
+    console.error("Error starting the server: ", err);
+});
